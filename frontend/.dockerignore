@@ -1,0 +1,17 @@
+# Variables de entorno
+.env
+.env.*
+
+# Logs
+*.log
+
+# Control de versiones
+.git/
+.gitignore
+
+# Editor
+.vscode/
+
+# Docker
+Dockerfile
+docker-compose.yml

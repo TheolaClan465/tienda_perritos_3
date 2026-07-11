@@ -1,0 +1,21 @@
+# Dependencias — se instalan dentro del contenedor
+node_modules/
+
+# Variables de entorno — nunca van dentro de la imagen
+.env
+.env.*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Control de versiones
+.git/
+.gitignore
+
+# Editor
+.vscode/
+
+# Docker
+Dockerfile
+docker-compose.yml

@@ -1,0 +1,88 @@
+services:
+  tienda-frontend:
+    build: ./frontend
+    container_name: tienda-frontend
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      tienda-backend:
+        condition: service_healthy
+    networks:
+      - tienda-network
+
+  tienda-backend:
+    build: ./backend
+    container_name: tienda-backend
+    environment:
+      DB_HOST: tienda-db
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-admin123}
+      DB_NAME: ${DB_NAME:-tienda_perritos}
+      DB_PORT: ${DB_PORT:-3306}
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+    depends_on:
+      tienda-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/productos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tienda-network
+
+  tienda-db:
+    image: mysql:8
+    container_name: tienda-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-admin123}
+      MYSQL_DATABASE: ${DB_NAME:-tienda_perritos}
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${DB_PASSWORD:-admin123}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - tienda-network
+
+  banner:
+    image: alpine:3.20
+    profiles:
+      - tools
+    depends_on:
+      - tienda-frontend
+      - tienda-backend
+    command: |
+      sh -c '
+        FRONTEND_PORT=${FRONTEND_PORT:-8080}
+        BACKEND_PORT=${BACKEND_PORT:-3001}
+        printf "\n\033[1;36m========================================\n"
+        printf "        TIENDA PERRITOS ONLINE\n"
+        printf "========================================\033[0m\n"
+        printf "\033[0;32mFrontend:      http://localhost:%s\033[0m\n" "$FRONTEND_PORT"
+        printf "\033[0;32mBackend API:   http://localhost:%s/api/productos\033[0m\n" "$BACKEND_PORT"
+        printf "\033[1;36m========================================\033[0m\n"
+      '
+    networks:
+      - tienda-network
+
+networks:
+  tienda-network:
+    driver: bridge
+
+volumes:
+  dbdata:
