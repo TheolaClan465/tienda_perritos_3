@@ -1,46 +1,13 @@
 services:
-  tienda-frontend:
-    build: ./frontend
-    container_name: tienda-frontend
-    ports:
-      - "${FRONTEND_PORT:-8080}:80"
-    depends_on:
-      tienda-backend:
-        condition: service_healthy
-    networks:
-      - tienda-network
-
-  tienda-backend:
-    build: ./backend
-    container_name: tienda-backend
-    environment:
-      DB_HOST: tienda-db
-      DB_USER: ${DB_USER:-root}
-      DB_PASSWORD: ${DB_PASSWORD:-admin123}
-      DB_NAME: ${DB_NAME:-tienda_perritos}
-      DB_PORT: ${DB_PORT:-3306}
-    ports:
-      - "${BACKEND_PORT:-3001}:3001"
-    depends_on:
-      tienda-db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/productos"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - tienda-network
-
   tienda-db:
-    image: mysql:8
+    build: ./db
     container_name: tienda-db
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-admin123}
-      MYSQL_DATABASE: ${DB_NAME:-tienda_perritos}
+    ports:
+      - "3306:3306"
     volumes:
       - dbdata:/var/lib/mysql
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - tienda-network
     healthcheck:
       test:
         [
@@ -51,32 +18,43 @@ services:
           "localhost",
           "-u",
           "root",
-          "-p${DB_PASSWORD:-admin123}",
+          "-padmin123",
         ]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
+
+  tienda-backend:
+    build: ./backend
+    container_name: tienda-backend
+    environment:
+      - DB_HOST=tienda-db
+      - DB_USER=root
+      - DB_PASSWORD=admin123
+      - DB_NAME=tienda_perritos
+      - DB_PORT=3306
+    ports:
+      - "3001:3001"
+    depends_on:
+      tienda-db:
+        condition: service_healthy
     networks:
       - tienda-network
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/api/productos || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  banner:
-    image: alpine:3.20
-    profiles:
-      - tools
+  tienda-frontend:
+    build: ./frontend
+    container_name: tienda-frontend
+    ports:
+      - "8080:80"
     depends_on:
-      - tienda-frontend
-      - tienda-backend
-    command: |
-      sh -c '
-        FRONTEND_PORT=${FRONTEND_PORT:-8080}
-        BACKEND_PORT=${BACKEND_PORT:-3001}
-        printf "\n\033[1;36m========================================\n"
-        printf "        TIENDA PERRITOS ONLINE\n"
-        printf "========================================\033[0m\n"
-        printf "\033[0;32mFrontend:      http://localhost:%s\033[0m\n" "$FRONTEND_PORT"
-        printf "\033[0;32mBackend API:   http://localhost:%s/api/productos\033[0m\n" "$BACKEND_PORT"
-        printf "\033[1;36m========================================\033[0m\n"
-      '
+      tienda-backend:
+        condition: service_healthy
     networks:
       - tienda-network
 
